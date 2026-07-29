@@ -4,8 +4,13 @@ import {
   getDirectoryContents,
   type FileBrowserItem,
 } from "@/lib/server-data";
+import FileUploader from "@/components/files/FileUploader";
+import DeleteFileButton from "@/components/files/DeleteFileButton";
 
 export const dynamic = "force-dynamic";
+
+const rowClassName =
+  "grid grid-cols-[minmax(0,1fr)_80px_72px] items-center border-b border-zinc-800 px-4 py-4 transition last:border-b-0 hover:bg-zinc-800/70 sm:grid-cols-[minmax(0,1fr)_140px_180px_90px]";
 
 type FilesPageProps = {
   searchParams: Promise<{
@@ -69,11 +74,14 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           ))}
         </nav>
 
+        <FileUploader currentPath={currentPath} />
+
         <section className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-          <div className="grid grid-cols-[minmax(0,1fr)_120px] border-b border-zinc-800 px-5 py-3 text-xs font-medium uppercase tracking-wider text-zinc-600 sm:grid-cols-[minmax(0,1fr)_140px_180px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_80px_72px] border-b border-zinc-800 px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-600 sm:grid-cols-[minmax(0,1fr)_140px_180px_90px]">
             <span>Name</span>
             <span className="text-right">Size</span>
             <span className="hidden text-right sm:block">Last modified</span>
+            <span className="text-right">Actions</span>
           </div>
 
           {errorMessage ? (
@@ -101,6 +109,14 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
                   <span className="hidden text-right text-sm text-zinc-500 sm:block">
                     {item.modifiedAt.toLocaleString()}
                   </span>
+
+                  <div className="flex justify-end">
+                    <DeleteFileButton
+                      itemName={item.name}
+                      relativePath={item.relativePath}
+                      isDirectory={item.isDirectory}
+                    />
+                  </div>
                 </>
               );
 
@@ -109,7 +125,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
                   <Link
                     key={item.relativePath}
                     href={createFilesUrl(item.relativePath)}
-                    className="grid grid-cols-[minmax(0,1fr)_120px] items-center border-b border-zinc-800 px-5 py-4 transition last:border-b-0 hover:bg-zinc-800/70 sm:grid-cols-[minmax(0,1fr)_140px_180px]"
+                    className={rowClassName}
                   >
                     {content}
                   </Link>
@@ -120,7 +136,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
                 <Link
                   key={item.relativePath}
                   href={createPreviewUrl(item.relativePath)}
-                  className="grid grid-cols-[minmax(0,1fr)_120px] items-center border-b border-zinc-800 px-5 py-4 transition last:border-b-0 hover:bg-zinc-800/70 sm:grid-cols-[minmax(0,1fr)_140px_180px]"
+                  className={rowClassName}
                 >
                   {content}
                 </Link>
