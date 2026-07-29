@@ -1,19 +1,12 @@
+import Link from "next/link";
 import {
   formatBytes,
   formatRelativeTime,
+  getDirectoryContents,
   getRecentFiles,
   getStorageInfo,
+  type FileBrowserItem,
 } from "@/lib/server-data";
-import Link from "next/link";
-
-const folders = [
-  { name: "Inbox", description: "New files waiting to be organized" },
-  { name: "School", description: "Current semester coursework" },
-  { name: "Projects", description: "Active development projects" },
-  { name: "Shared", description: "Files shared between devices" },
-  { name: "Transfer", description: "Files ready to move to the Mac" },
-  { name: "Archive", description: "Temporary archived files" },
-];
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +15,16 @@ export default async function Home() {
     getStorageInfo(),
     getRecentFiles(),
   ]);
+
+  let quickAccessItems: FileBrowserItem[] = [];
+  let quickAccessError: string | null = null;
+
+  try {
+    quickAccessItems = await getDirectoryContents("");
+  } catch (error) {
+    console.error("Unable to load ConnorHub root directory:", error);
+    quickAccessError = "The ConnorHub root directory could not be loaded.";
+  }
 
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-8 text-zinc-100">
@@ -100,36 +103,64 @@ export default async function Home() {
 
         <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
           <section>
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold">Quick access</h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                Browse the main ConnorHub storage areas.
-              </p>
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Quick access</h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  Browse the main ConnorHub storage areas.
+                </p>
+              </div>
+
+              <Link
+                href="/files"
+                className="shrink-0 text-sm font-medium text-zinc-400 transition hover:text-zinc-100"
+              >
+                Browse all files →
+              </Link>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {folders.map((folder) => (
-                <Link
-                  key={folder.name}
-                  href={`/files?path=${encodeURIComponent(folder.name)}`}
-                  className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 transition hover:border-zinc-700 hover:bg-zinc-800/80"
-                >
-                  <div className="mb-8 flex items-start justify-between">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-800 text-xl">
-                      📁
+            {quickAccessError ? (
+              <div className="rounded-2xl border border-red-900/60 bg-red-950/30 p-6 text-sm text-red-300">
+                {quickAccessError}
+              </div>
+            ) : quickAccessItems.length === 0 ? (
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 text-sm text-zinc-500">
+                No files or folders were found in ConnorHub storage.
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {quickAccessItems.map((item) => (
+                  <Link
+                    key={item.relativePath}
+                    href={createItemUrl(item)}
+                    className="group rounded-2xl border border-zinc-800 bg-zinc-900 p-5 transition hover:border-zinc-700 hover:bg-zinc-800/80"
+                  >
+                    <div className="mb-8 flex items-start justify-between">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-800 text-xl transition group-hover:bg-zinc-700">
+                        {item.isDirectory ? "📁" : "📄"}
+                      </div>
+
+                      <span className="text-zinc-600 transition group-hover:text-zinc-300">
+                        →
+                      </span>
                     </div>
 
-                    <span className="text-zinc-600">→</span>
-                  </div>
+                    <h3 className="truncate font-semibold">{item.name}</h3>
 
-                  <h3 className="font-semibold">{folder.name}</h3>
+                    <p className="mt-1 text-sm leading-6 text-zinc-500">
+                      {item.isDirectory
+                        ? "Folder"
+                        : formatBytes(item.sizeBytes)}
+                    </p>
 
-                  <p className="mt-1 text-sm leading-6 text-zinc-500">
-                    {folder.description}
-                  </p>
-                </Link>
-              ))}
-            </div>
+                    <p className="mt-2 text-xs text-zinc-600">
+                      Modified {formatRelativeTime(item.modifiedAt)}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
           </section>
 
           <aside>
@@ -149,9 +180,10 @@ export default async function Home() {
                 </div>
               ) : (
                 recentFiles.map((file, index) => (
-                  <div
+                  <Link
                     key={file.relativePath}
-                    className={`p-5 ${
+                    href={createItemUrl(file)}
+                    className={`block p-5 transition hover:bg-zinc-800/70 ${
                       index !== recentFiles.length - 1
                         ? "border-b border-zinc-800"
                         : ""
@@ -171,7 +203,7 @@ export default async function Home() {
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))
               )}
             </div>
@@ -196,4 +228,27 @@ function StatCard({ label, value, detail }: StatCardProps) {
       <p className="mt-1 text-sm text-zinc-600">{detail}</p>
     </article>
   );
+}
+
+type NavigableItem = {
+  relativePath: string;
+  isDirectory: boolean;
+};
+
+function createItemUrl(item: NavigableItem): string {
+  return item.isDirectory
+    ? createFilesUrl(item.relativePath)
+    : createPreviewUrl(item.relativePath);
+}
+
+function createFilesUrl(relativePath: string): string {
+  if (!relativePath) {
+    return "/files";
+  }
+
+  return `/files?path=${encodeURIComponent(relativePath)}`;
+}
+
+function createPreviewUrl(relativePath: string): string {
+  return `/preview?path=${encodeURIComponent(relativePath)}`;
 }

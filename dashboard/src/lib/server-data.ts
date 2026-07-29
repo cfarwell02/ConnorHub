@@ -1,7 +1,41 @@
-import { readdir, stat, statfs } from "node:fs/promises";
+import { realpath, readdir, stat, statfs } from "node:fs/promises";
 import path from "node:path";
 
 export const CONNORHUB_ROOT = process.env.CONNORHUB_ROOT ?? "/srv/connorhub";
+
+export async function resolveConnorHubPath(
+  requestedPath: string,
+): Promise<string> {
+  const resolvedRoot = await realpath(CONNORHUB_ROOT);
+
+  const normalizedPath = requestedPath
+    .replaceAll("\\", "/")
+    .split("/")
+    .filter((segment) => segment && segment !== "." && segment !== "..")
+    .join(path.sep);
+
+  const candidatePath = path.resolve(resolvedRoot, normalizedPath);
+
+  const isInsideRoot =
+    candidatePath === resolvedRoot ||
+    candidatePath.startsWith(`${resolvedRoot}${path.sep}`);
+
+  if (!isInsideRoot) {
+    throw new Error("Requested path is outside ConnorHub storage.");
+  }
+
+  const resolvedCandidate = await realpath(candidatePath);
+
+  const resolvedCandidateIsInsideRoot =
+    resolvedCandidate === resolvedRoot ||
+    resolvedCandidate.startsWith(`${resolvedRoot}${path.sep}`);
+
+  if (!resolvedCandidateIsInsideRoot) {
+    throw new Error("Requested path resolves outside ConnorHub storage.");
+  }
+
+  return resolvedCandidate;
+}
 
 export type RecentFile = {
   name: string;
@@ -65,19 +99,8 @@ export async function getRecentFiles(limit = 8): Promise<RecentFile[]> {
 export async function getDirectoryContents(
   requestedPath = "",
 ): Promise<FileBrowserItem[]> {
-  const normalizedPath = path
-    .normalize(requestedPath)
-    .replace(/^(\.\.(\/|\\|$))+/, "");
-  const absolutePath = path.resolve(CONNORHUB_ROOT, normalizedPath);
-  const resolvedRoot = path.resolve(CONNORHUB_ROOT);
-
-  const isInsideRoot =
-    absolutePath === resolvedRoot ||
-    absolutePath.startsWith(`${resolvedRoot}${path.sep}`);
-
-  if (!isInsideRoot) {
-    throw new Error("Requested path is outside ConnorHub storage.");
-  }
+  const absolutePath = await resolveConnorHubPath(requestedPath);
+  const resolvedRoot = await realpath(CONNORHUB_ROOT);
 
   const entries = await readdir(absolutePath, {
     withFileTypes: true,

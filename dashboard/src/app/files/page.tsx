@@ -117,12 +117,13 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
               }
 
               return (
-                <div
+                <Link
                   key={item.relativePath}
-                  className="grid grid-cols-[minmax(0,1fr)_120px] items-center border-b border-zinc-800 px-5 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_140px_180px]"
+                  href={createPreviewUrl(item.relativePath)}
+                  className="grid grid-cols-[minmax(0,1fr)_120px] items-center border-b border-zinc-800 px-5 py-4 transition last:border-b-0 hover:bg-zinc-800/70 sm:grid-cols-[minmax(0,1fr)_140px_180px]"
                 >
                   {content}
-                </div>
+                </Link>
               );
             })
           )}
@@ -145,6 +146,10 @@ function createFilesUrl(relativePath: string): string {
   }
 
   return `/files?path=${encodeURIComponent(relativePath)}`;
+}
+
+function createPreviewUrl(relativePath: string): string {
+  return `/preview?path=${encodeURIComponent(relativePath)}`;
 }
 
 function buildBreadcrumbs(relativePath: string) {
