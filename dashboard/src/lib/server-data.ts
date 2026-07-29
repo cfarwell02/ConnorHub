@@ -18,6 +18,14 @@ export type StorageInfo = {
   usedPercent: number;
 };
 
+export type FileBrowserItem = {
+  name: string;
+  relativePath: string;
+  isDirectory: boolean;
+  sizeBytes: number;
+  modifiedAt: Date;
+};
+
 export async function getStorageInfo(): Promise<StorageInfo | null> {
   try {
     const storage = await statfs(CONNORHUB_ROOT);
@@ -52,6 +60,58 @@ export async function getRecentFiles(limit = 8): Promise<RecentFile[]> {
     console.error("Unable to read recent ConnorHub files:", error);
     return [];
   }
+}
+
+export async function getDirectoryContents(
+  requestedPath = "",
+): Promise<FileBrowserItem[]> {
+  const normalizedPath = path
+    .normalize(requestedPath)
+    .replace(/^(\.\.(\/|\\|$))+/, "");
+  const absolutePath = path.resolve(CONNORHUB_ROOT, normalizedPath);
+  const resolvedRoot = path.resolve(CONNORHUB_ROOT);
+
+  const isInsideRoot =
+    absolutePath === resolvedRoot ||
+    absolutePath.startsWith(`${resolvedRoot}${path.sep}`);
+
+  if (!isInsideRoot) {
+    throw new Error("Requested path is outside ConnorHub storage.");
+  }
+
+  const entries = await readdir(absolutePath, {
+    withFileTypes: true,
+  });
+
+  const items = await Promise.all(
+    entries
+      .filter((entry) => !entry.name.startsWith("."))
+      .map(async (entry) => {
+        const entryAbsolutePath = path.join(absolutePath, entry.name);
+        const fileStats = await stat(entryAbsolutePath);
+
+        return {
+          name: entry.name,
+          relativePath: path
+            .relative(resolvedRoot, entryAbsolutePath)
+            .split(path.sep)
+            .join("/"),
+          isDirectory: entry.isDirectory(),
+          sizeBytes: entry.isDirectory() ? 0 : fileStats.size,
+          modifiedAt: fileStats.mtime,
+        };
+      }),
+  );
+
+  return items.sort((a, b) => {
+    if (a.isDirectory !== b.isDirectory) {
+      return a.isDirectory ? -1 : 1;
+    }
+
+    return a.name.localeCompare(b.name, undefined, {
+      sensitivity: "base",
+    });
+  });
 }
 
 async function scanDirectory(

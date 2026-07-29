@@ -4,6 +4,7 @@ import {
   getRecentFiles,
   getStorageInfo,
 } from "@/lib/server-data";
+import Link from "next/link";
 
 const folders = [
   { name: "Inbox", description: "New files waiting to be organized" },
@@ -108,8 +109,9 @@ export default async function Home() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               {folders.map((folder) => (
-                <article
+                <Link
                   key={folder.name}
+                  href={`/files?path=${encodeURIComponent(folder.name)}`}
                   className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 transition hover:border-zinc-700 hover:bg-zinc-800/80"
                 >
                   <div className="mb-8 flex items-start justify-between">
@@ -125,7 +127,7 @@ export default async function Home() {
                   <p className="mt-1 text-sm leading-6 text-zinc-500">
                     {folder.description}
                   </p>
-                </article>
+                </Link>
               ))}
             </div>
           </section>
