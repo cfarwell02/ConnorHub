@@ -6,12 +6,13 @@ import {
 } from "@/lib/server-data";
 import FileUploader from "@/components/files/FileUploader";
 import DeleteFileButton from "@/components/files/DeleteFileButton";
+import CreateFolderButton from "@/components/files/CreateFolderButton";
+import RenameFileButton from "@/components/files/RenameFileButton";
 
 export const dynamic = "force-dynamic";
 
 const rowClassName =
-  "grid grid-cols-[minmax(0,1fr)_80px_72px] items-center border-b border-zinc-800 px-4 py-4 transition last:border-b-0 hover:bg-zinc-800/70 sm:grid-cols-[minmax(0,1fr)_140px_180px_90px]";
-
+  "grid grid-cols-[minmax(0,1fr)_70px_150px] items-center border-b border-zinc-800 transition last:border-b-0 hover:bg-zinc-800/70 sm:grid-cols-[minmax(0,1fr)_120px_180px_180px]";
 type FilesPageProps = {
   searchParams: Promise<{
     path?: string;
@@ -74,10 +75,14 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           ))}
         </nav>
 
+        <div className="mb-5 flex justify-end">
+          <CreateFolderButton currentPath={currentPath} />
+        </div>
+
         <FileUploader currentPath={currentPath} />
 
         <section className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-          <div className="grid grid-cols-[minmax(0,1fr)_80px_72px] border-b border-zinc-800 px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-600 sm:grid-cols-[minmax(0,1fr)_140px_180px_90px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_70px_150px] border-b border-zinc-800 px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-600 sm:grid-cols-[minmax(0,1fr)_120px_180px_180px]">
             <span>Name</span>
             <span className="text-right">Size</span>
             <span className="hidden text-right sm:block">Last modified</span>
@@ -92,54 +97,47 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
             </div>
           ) : (
             items.map((item) => {
-              const content = (
-                <>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800">
-                      {item.isDirectory ? "📁" : "📄"}
+              const href = item.isDirectory
+                ? createFilesUrl(item.relativePath)
+                : createPreviewUrl(item.relativePath);
+
+              return (
+                <div key={item.relativePath} className={rowClassName}>
+                  <Link
+                    href={href}
+                    className="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_70px] items-center px-4 py-4 sm:col-span-3 sm:grid-cols-[minmax(0,1fr)_120px_180px]"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800">
+                        {item.isDirectory ? "📁" : "📄"}
+                      </span>
+
+                      <span className="truncate font-medium">{item.name}</span>
+                    </div>
+
+                    <span className="text-right text-sm text-zinc-500">
+                      {item.isDirectory ? "—" : formatBytes(item.sizeBytes)}
                     </span>
 
-                    <span className="truncate font-medium">{item.name}</span>
-                  </div>
+                    <span className="hidden text-right text-sm text-zinc-500 sm:block">
+                      {item.modifiedAt.toLocaleString()}
+                    </span>
+                  </Link>
 
-                  <span className="text-right text-sm text-zinc-500">
-                    {item.isDirectory ? "—" : formatBytes(item.sizeBytes)}
-                  </span>
+                  <div className="flex justify-end gap-2 px-4 py-4">
+                    <RenameFileButton
+                      itemName={item.name}
+                      relativePath={item.relativePath}
+                      isDirectory={item.isDirectory}
+                    />
 
-                  <span className="hidden text-right text-sm text-zinc-500 sm:block">
-                    {item.modifiedAt.toLocaleString()}
-                  </span>
-
-                  <div className="flex justify-end">
                     <DeleteFileButton
                       itemName={item.name}
                       relativePath={item.relativePath}
                       isDirectory={item.isDirectory}
                     />
                   </div>
-                </>
-              );
-
-              if (item.isDirectory) {
-                return (
-                  <Link
-                    key={item.relativePath}
-                    href={createFilesUrl(item.relativePath)}
-                    className={rowClassName}
-                  >
-                    {content}
-                  </Link>
-                );
-              }
-
-              return (
-                <Link
-                  key={item.relativePath}
-                  href={createPreviewUrl(item.relativePath)}
-                  className={rowClassName}
-                >
-                  {content}
-                </Link>
+                </div>
               );
             })
           )}
