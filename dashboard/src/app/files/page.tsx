@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { formatBytes, getDirectoryContents } from "@/lib/server-data";
+import {
+  formatBytes,
+  getDirectoryContents,
+  type FileBrowserItem,
+} from "@/lib/server-data";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +17,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
   const { path: requestedPath = "" } = await searchParams;
   const currentPath = sanitizeDisplayPath(requestedPath);
 
-  let items = [];
+  let items: FileBrowserItem[] = [];
   let errorMessage: string | null = null;
 
   try {
