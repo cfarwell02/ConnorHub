@@ -1,3 +1,10 @@
+import {
+  formatBytes,
+  formatRelativeTime,
+  getRecentFiles,
+  getStorageInfo,
+} from "@/lib/server-data";
+
 const folders = [
   { name: "Inbox", description: "New files waiting to be organized" },
   { name: "School", description: "Current semester coursework" },
@@ -7,25 +14,14 @@ const folders = [
   { name: "Archive", description: "Temporary archived files" },
 ];
 
-const recentFiles = [
-  {
-    name: "test-from-mac.txt",
-    location: "Inbox",
-    modified: "A few moments ago",
-  },
-  {
-    name: "ConnorHub setup notes.md",
-    location: "Projects",
-    modified: "Today",
-  },
-  {
-    name: "Fall 2026",
-    location: "School",
-    modified: "Today",
-  },
-];
+export const dynamic = "force-dynamic";
 
-export default function Home() {
+export default async function Home() {
+  const [storage, recentFiles] = await Promise.all([
+    getStorageInfo(),
+    getRecentFiles(),
+  ]);
+
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-8 text-zinc-100">
       <div className="mx-auto max-w-7xl">
@@ -47,24 +43,59 @@ export default function Home() {
 
           <div className="flex items-center gap-2 rounded-full border border-emerald-900 bg-emerald-950/50 px-4 py-2 text-sm text-emerald-300">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Raspberry Pi online
+            Dashboard online
           </div>
         </header>
 
         <section className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Storage used"
-            value="12.4 GB"
-            detail="105.7 GB free"
+            value={storage ? formatBytes(storage.usedBytes) : "Unavailable"}
+            detail={
+              storage
+                ? `${formatBytes(storage.freeBytes)} free`
+                : "Storage path unavailable"
+            }
           />
-          <StatCard label="Recent files" value="3" detail="Modified today" />
+
           <StatCard
-            label="Devices online"
-            value="3"
-            detail="Pi, Mac, ThinkPad"
+            label="Storage capacity"
+            value={storage ? formatBytes(storage.totalBytes) : "Unavailable"}
+            detail={
+              storage ? `${storage.usedPercent}% used` : "Check configuration"
+            }
           />
-          <StatCard label="Pi temperature" value="42°C" detail="Normal" />
+
+          <StatCard
+            label="Recent items"
+            value={String(recentFiles.length)}
+            detail="Latest server activity"
+          />
+
+          <StatCard
+            label="Server location"
+            value="Raspberry Pi"
+            detail="Connected through Tailscale"
+          />
         </section>
+
+        {storage && (
+          <section className="mb-10 rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-medium">Storage usage</p>
+              <p className="text-sm text-zinc-500">{storage.usedPercent}%</p>
+            </div>
+
+            <div className="h-3 overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full rounded-full bg-zinc-100 transition-all"
+                style={{
+                  width: `${Math.min(storage.usedPercent, 100)}%`,
+                }}
+              />
+            </div>
+          </section>
+        )}
 
         <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
           <section>
@@ -90,6 +121,7 @@ export default function Home() {
                   </div>
 
                   <h3 className="font-semibold">{folder.name}</h3>
+
                   <p className="mt-1 text-sm leading-6 text-zinc-500">
                     {folder.description}
                   </p>
@@ -101,35 +133,45 @@ export default function Home() {
           <aside>
             <div className="mb-4">
               <h2 className="text-xl font-semibold">Recent activity</h2>
+
               <p className="mt-1 text-sm text-zinc-500">
                 Latest changes across the server.
               </p>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-              {recentFiles.map((file, index) => (
-                <div
-                  key={`${file.location}-${file.name}`}
-                  className={`p-5 ${
-                    index !== recentFiles.length - 1
-                      ? "border-b border-zinc-800"
-                      : ""
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800">
-                      📄
-                    </div>
+              {recentFiles.length === 0 ? (
+                <div className="p-6 text-sm text-zinc-500">
+                  No files were found. Confirm that the dashboard can access the
+                  ConnorHub storage folder.
+                </div>
+              ) : (
+                recentFiles.map((file, index) => (
+                  <div
+                    key={file.relativePath}
+                    className={`p-5 ${
+                      index !== recentFiles.length - 1
+                        ? "border-b border-zinc-800"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800">
+                        {file.isDirectory ? "📁" : "📄"}
+                      </div>
 
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{file.name}</p>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {file.location} · {file.modified}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{file.name}</p>
+
+                        <p className="mt-1 text-sm text-zinc-500">
+                          {file.location} ·{" "}
+                          {formatRelativeTime(file.modifiedAt)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </aside>
         </div>
