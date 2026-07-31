@@ -11,13 +11,26 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [storage, recentFiles] = await Promise.all([
+  const [storage, recentFiles, quickAccessResult] = await Promise.all([
     getStorageInfo(),
     getRecentFiles(),
+    getDirectoryContents("")
+      .then((items) => ({
+        items,
+        error: null,
+      }))
+      .catch((error: unknown) => {
+        console.error("Unable to load ConnorHub root directory:", error);
+
+        return {
+          items: [] as FileBrowserItem[],
+          error: "The ConnorHub root directory could not be loaded.",
+        };
+      }),
   ]);
 
-  let quickAccessItems: FileBrowserItem[] = [];
-  let quickAccessError: string | null = null;
+  let quickAccessItems = quickAccessResult.items;
+  let quickAccessError = quickAccessResult.error;
 
   try {
     quickAccessItems = await getDirectoryContents("");

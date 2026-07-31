@@ -85,7 +85,7 @@ export async function getRecentFiles(limit = 8): Promise<RecentFile[]> {
   try {
     const results: RecentFile[] = [];
 
-    await scanDirectory(CONNORHUB_ROOT, CONNORHUB_ROOT, results);
+    await scanDirectory(CONNORHUB_ROOT, CONNORHUB_ROOT, results, 0, 2);
 
     return results
       .sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime())
@@ -137,18 +137,32 @@ export async function getDirectoryContents(
   });
 }
 
+const IGNORED_DIRECTORIES = new Set([
+  "node_modules",
+  ".git",
+  ".next",
+  "dist",
+  "build",
+  "coverage",
+]);
+
 async function scanDirectory(
   directory: string,
   rootDirectory: string,
   results: RecentFile[],
+  currentDepth: number,
+  maxDepth: number,
 ): Promise<void> {
   const entries = await readdir(directory, {
     withFileTypes: true,
   });
 
   for (const entry of entries) {
-    // Ignore hidden files such as macOS metadata files.
     if (entry.name.startsWith(".")) {
+      continue;
+    }
+
+    if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) {
       continue;
     }
 
@@ -164,12 +178,17 @@ async function scanDirectory(
       isDirectory: entry.isDirectory(),
     });
 
-    if (entry.isDirectory()) {
-      await scanDirectory(absolutePath, rootDirectory, results);
+    if (entry.isDirectory() && currentDepth < maxDepth) {
+      await scanDirectory(
+        absolutePath,
+        rootDirectory,
+        results,
+        currentDepth + 1,
+        maxDepth,
+      );
     }
   }
 }
-
 export function formatBytes(bytes: number): string {
   if (bytes === 0) {
     return "0 B";
