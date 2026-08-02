@@ -20,6 +20,7 @@ import DeleteFileButton from "@/components/files/DeleteFileButton";
 import RenameFileButton from "@/components/files/RenameFileButton";
 import type { FileBrowserItem } from "@/types/files";
 import FileContextMenu from "./FileContextMenu";
+import FolderDropTarget from "./FolderDropTarget";
 
 type SortOption = "name" | "modified" | "size" | "type";
 type ViewMode = "list" | "grid";
@@ -169,13 +170,23 @@ function ListView({
             ? createFilesUrl(item.relativePath)
             : createPreviewUrl(item.relativePath);
 
-          return (
+          const row = (
             <FileContextMenu
-              key={item.relativePath}
               relativePath={item.relativePath}
+              href={href}
+              itemName={item.name}
               initialPinned={pinnedPaths.includes(item.relativePath)}
             >
-              <div className="grid grid-cols-[minmax(0,1fr)_70px_170px] items-center transition hover:bg-zinc-800/45 sm:grid-cols-[minmax(0,1fr)_110px_180px_220px]">
+              <div
+                draggable
+                onDragStart={(event) => {
+                  event.currentTarget.classList.add("opacity-50");
+                  handleDragStart(event, item.relativePath);
+                }}
+                onDragEnd={handleDragEnd}
+                className="grid grid-cols-[minmax(0,1fr)_70px_170px] cursor-grab items-center transition active:cursor-grabbing hover:bg-zinc-800/45 sm:grid-cols-[minmax(0,1fr)_110px_180px_220px]"
+              >
+                {" "}
                 <Link
                   href={href}
                   className="flex min-w-0 items-center gap-3 px-4 py-3.5"
@@ -192,15 +203,12 @@ function ListView({
                     </p>
                   </div>
                 </Link>
-
                 <span className="px-2 text-right text-sm text-zinc-500">
                   {item.isDirectory ? "—" : formatBytes(item.sizeBytes)}
                 </span>
-
                 <span className="hidden px-2 text-right text-sm text-zinc-500 sm:block">
                   {formatModifiedDate(item.modifiedAt)}
                 </span>
-
                 <div className="flex items-center justify-end gap-1 px-4 py-3">
                   <RenameFileButton
                     itemName={item.name}
@@ -216,6 +224,17 @@ function ListView({
                 </div>
               </div>
             </FileContextMenu>
+          );
+
+          return item.isDirectory ? (
+            <FolderDropTarget
+              key={item.relativePath}
+              destinationPath={item.relativePath}
+            >
+              {row}
+            </FolderDropTarget>
+          ) : (
+            <div key={item.relativePath}>{row}</div>
           );
         })}
       </div>
@@ -237,13 +256,23 @@ function GridView({
           ? createFilesUrl(item.relativePath)
           : createPreviewUrl(item.relativePath);
 
-        return (
+        const card = (
           <FileContextMenu
-            key={item.relativePath}
             relativePath={item.relativePath}
+            href={href}
+            itemName={item.name}
             initialPinned={pinnedPaths.includes(item.relativePath)}
           >
-            <div className="group relative rounded-xl border border-zinc-800 bg-zinc-900 p-3 transition hover:border-zinc-700 hover:bg-zinc-800/60">
+            <div
+              draggable
+              onDragStart={(event) => {
+                event.currentTarget.classList.add("opacity-50");
+                handleDragStart(event, item.relativePath);
+              }}
+              onDragEnd={handleDragEnd}
+              className="group relative cursor-grab rounded-xl border border-zinc-800 bg-zinc-900 p-3 transition active:cursor-grabbing hover:border-zinc-700 hover:bg-zinc-800/60"
+            >
+              {" "}
               <Link href={href} className="block">
                 <div className="flex h-24 items-center justify-center rounded-lg bg-zinc-950/60">
                   <FileIcon item={item} size={38} />
@@ -259,7 +288,6 @@ function GridView({
                   </p>
                 </div>
               </Link>
-
               <div className="mt-3 flex justify-end gap-2 border-t border-zinc-800 pt-3">
                 <RenameFileButton
                   itemName={item.name}
@@ -275,6 +303,17 @@ function GridView({
               </div>
             </div>
           </FileContextMenu>
+        );
+
+        return item.isDirectory ? (
+          <FolderDropTarget
+            key={item.relativePath}
+            destinationPath={item.relativePath}
+          >
+            {card}
+          </FolderDropTarget>
+        ) : (
+          <div key={item.relativePath}>{card}</div>
         );
       })}
     </section>
@@ -453,4 +492,16 @@ function formatBytes(bytes: number): string {
   const value = bytes / 1024 ** unitIndex;
 
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function handleDragStart(
+  event: React.DragEvent<HTMLElement>,
+  relativePath: string,
+) {
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("application/x-connorhub-path", relativePath);
+}
+
+function handleDragEnd(event: React.DragEvent<HTMLElement>) {
+  event.currentTarget.classList.remove("opacity-50");
 }

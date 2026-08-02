@@ -1,27 +1,75 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition } from "react";
-import { Pin, PinOff } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useState,
+  useTransition,
+} from "react";
+import { ExternalLink, FolderInput, Pin, PinOff } from "lucide-react";
+import MoveFileDialog from "@/components/files/MoveFileDialog";
 
 type FileContextMenuProps = {
+  href: string;
   relativePath: string;
+  itemName: string;
   initialPinned: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
+};
+
+type MenuPosition = {
+  x: number;
+  y: number;
 };
 
 export default function FileContextMenu({
+  href,
   relativePath,
+  itemName,
   initialPinned,
   children,
 }: FileContextMenuProps) {
+  const router = useRouter();
+  const menuId = useId();
+
   const [isOpen, setIsOpen] = useState(false);
   const [isPinned, setIsPinned] = useState(initialPinned);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+  const [position, setPosition] = useState<MenuPosition>({
+    x: 0,
+    y: 0,
+  });
   const [isPending, startTransition] = useTransition();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const menuId = useId();
-  const router = useRouter();
+
+  useEffect(() => {
+    function closeMenu() {
+      setIsOpen(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("blur", closeMenu);
+    window.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("blur", closeMenu);
+      window.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, []);
 
   useEffect(() => {
     function handleAnotherMenuOpened(event: Event) {
@@ -45,29 +93,7 @@ export default function FileContextMenu({
     };
   }, [menuId]);
 
-  useEffect(() => {
-    function closeMenu() {
-      setIsOpen(false);
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    }
-
-    window.addEventListener("click", closeMenu);
-    window.addEventListener("blur", closeMenu);
-    window.addEventListener("keydown", handleEscape);
-
-    return () => {
-      window.removeEventListener("click", closeMenu);
-      window.removeEventListener("blur", closeMenu);
-      window.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
-
-  function handleContextMenu(event: React.MouseEvent<HTMLDivElement>) {
+  function handleContextMenu(event: MouseEvent<HTMLDivElement>) {
     event.preventDefault();
     event.stopPropagation();
 
@@ -77,74 +103,155 @@ export default function FileContextMenu({
       }),
     );
 
-    const menuWidth = 220;
-    const menuHeight = 52;
+    const menuWidth = 224;
+    const menuHeight = 112;
+    const viewportPadding = 12;
 
     setPosition({
-      x: Math.min(event.clientX, window.innerWidth - menuWidth - 12),
-      y: Math.min(event.clientY, window.innerHeight - menuHeight - 12),
+      x: Math.max(
+        viewportPadding,
+        Math.min(
+          event.clientX,
+          window.innerWidth - menuWidth - viewportPadding,
+        ),
+      ),
+      y: Math.max(
+        viewportPadding,
+        Math.min(
+          event.clientY,
+          window.innerHeight - menuHeight - viewportPadding,
+        ),
+      ),
     });
 
     setIsOpen(true);
   }
 
-  function handleTogglePinned(event: React.MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-
+  function handleTogglePinned() {
     startTransition(async () => {
-      const response = await fetch("/api/files/pin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          relativePath,
-        }),
-      });
+      try {
+        const response = await fetch("/api/files/pin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            relativePath,
+          }),
+        });
 
-      if (!response.ok) {
-        return;
+        if (!response.ok) {
+          throw new Error("Unable to update pinned state.");
+        }
+
+        const result = (await response.json()) as {
+          pinned: boolean;
+        };
+
+        setIsPinned(result.pinned);
+        setIsOpen(false);
+        router.refresh();
+      } catch (error) {
+        console.error("Unable to update pinned state:", error);
       }
-
-      const result = (await response.json()) as {
-        pinned: boolean;
-      };
-
-      setIsPinned(result.pinned);
-      setIsOpen(false);
-      router.refresh();
     });
   }
 
   return (
-    <div ref={containerRef} onContextMenu={handleContextMenu}>
+    <div onContextMenu={handleContextMenu}>
       {children}
 
       {isOpen && (
         <div
           role="menu"
-          className="fixed z-50 w-52 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 p-1 shadow-2xl shadow-black/40"
+          aria-label="File actions"
+          className="fixed z-50 w-56 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 p-1 shadow-2xl shadow-black/50"
           style={{
             left: position.x,
             top: position.y,
           }}
           onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
         >
-          <button
-            type="button"
-            role="menuitem"
+          <ContextMenuLink
+            href={href}
+            icon={<ExternalLink size={16} />}
+            label="Open"
+            onClick={() => setIsOpen(false)}
+          />
+
+          <div className="my-1 border-t border-zinc-800" />
+
+          <ContextMenuButton
+            icon={isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+            label={isPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
             disabled={isPending}
             onClick={handleTogglePinned}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
-          >
-            {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
-
-            <span>
-              {isPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
-            </span>
-          </button>
+          />
+          <ContextMenuButton
+            icon={<FolderInput size={16} />}
+            label="Move..."
+            onClick={() => {
+              setIsOpen(false);
+              setIsMoveDialogOpen(true);
+            }}
+          />
         </div>
       )}
+      <MoveFileDialog
+        itemName={itemName}
+        relativePath={relativePath}
+        isOpen={isMoveDialogOpen}
+        onClose={() => setIsMoveDialogOpen(false)}
+      />
     </div>
+  );
+}
+
+type ContextMenuButtonProps = {
+  icon: ReactNode;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+};
+
+function ContextMenuButton({
+  icon,
+  label,
+  disabled = false,
+  onClick,
+}: ContextMenuButtonProps) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <span className="text-zinc-500">{icon}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+type ContextMenuLinkProps = {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+};
+
+function ContextMenuLink({ href, icon, label, onClick }: ContextMenuLinkProps) {
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100"
+    >
+      <span className="text-zinc-500">{icon}</span>
+      <span>{label}</span>
+    </Link>
   );
 }
