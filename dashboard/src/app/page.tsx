@@ -5,8 +5,8 @@ import {
   getDirectoryContents,
   getRecentFiles,
   getStorageInfo,
-  type FileBrowserItem,
 } from "@/lib/server-data";
+import type { FileBrowserItem } from "@/types/files";
 
 export const dynamic = "force-dynamic";
 

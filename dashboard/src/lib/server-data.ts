@@ -1,5 +1,6 @@
 import { realpath, readdir, stat, statfs } from "node:fs/promises";
 import path from "node:path";
+import type { FileBrowserItem } from "@/types/files";
 
 export const CONNORHUB_ROOT = process.env.CONNORHUB_ROOT ?? "/srv/connorhub";
 
@@ -50,14 +51,6 @@ export type StorageInfo = {
   usedBytes: number;
   freeBytes: number;
   usedPercent: number;
-};
-
-export type FileBrowserItem = {
-  name: string;
-  relativePath: string;
-  isDirectory: boolean;
-  sizeBytes: number;
-  modifiedAt: Date;
 };
 
 export async function getStorageInfo(): Promise<StorageInfo | null> {
