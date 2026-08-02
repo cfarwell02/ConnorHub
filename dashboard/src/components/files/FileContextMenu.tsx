@@ -10,7 +10,14 @@ import {
   useState,
   useTransition,
 } from "react";
-import { ExternalLink, FolderInput, Pin, PinOff, CopyPlus } from "lucide-react";
+import {
+  ExternalLink,
+  FolderInput,
+  Pin,
+  PinOff,
+  CopyPlus,
+  Trash2,
+} from "lucide-react";
 import MoveFileDialog from "@/components/files/MoveFileDialog";
 
 type FileContextMenuProps = {
@@ -186,6 +193,37 @@ export default function FileContextMenu({
     });
   }
 
+  function handleMoveToTrash() {
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/files/trash", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            relativePath,
+          }),
+        });
+
+        const result = (await response.json()) as {
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ?? "The item could not be moved to Trash.",
+          );
+        }
+
+        setIsOpen(false);
+        router.refresh();
+      } catch (error) {
+        console.error("Unable to move item to Trash:", error);
+      }
+    });
+  }
+
   return (
     <div onContextMenu={handleContextMenu}>
       {children}
@@ -231,6 +269,15 @@ export default function FileContextMenu({
             disabled={isPending}
             onClick={handleDuplicate}
           />
+          <div className="my-1 border-t border-zinc-800" />
+
+          <ContextMenuButton
+            icon={<Trash2 size={16} />}
+            label="Move to Trash"
+            disabled={isPending}
+            onClick={handleMoveToTrash}
+            destructive
+          />
         </div>
       )}
       <MoveFileDialog
@@ -247,6 +294,7 @@ type ContextMenuButtonProps = {
   icon: ReactNode;
   label: string;
   disabled?: boolean;
+  destructive?: boolean;
   onClick: () => void;
 };
 
@@ -254,6 +302,7 @@ function ContextMenuButton({
   icon,
   label,
   disabled = false,
+  destructive = false,
   onClick,
 }: ContextMenuButtonProps) {
   return (
@@ -262,9 +311,16 @@ function ContextMenuButton({
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        destructive
+          ? "text-red-300 hover:bg-red-950/50 hover:text-red-200"
+          : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+      }`}
     >
-      <span className="text-zinc-500">{icon}</span>
+      <span className={destructive ? "text-red-400" : "text-zinc-500"}>
+        {icon}
+      </span>
+
       <span>{label}</span>
     </button>
   );

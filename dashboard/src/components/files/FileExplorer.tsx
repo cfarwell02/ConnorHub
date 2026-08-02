@@ -16,7 +16,6 @@ import {
   Search,
 } from "lucide-react";
 
-import DeleteFileButton from "@/components/files/DeleteFileButton";
 import RenameFileButton from "@/components/files/RenameFileButton";
 import type { FileBrowserItem } from "@/types/files";
 import FileContextMenu from "./FileContextMenu";
@@ -215,12 +214,6 @@ function ListView({
                     relativePath={item.relativePath}
                     isDirectory={item.isDirectory}
                   />
-
-                  <DeleteFileButton
-                    itemName={item.name}
-                    relativePath={item.relativePath}
-                    isDirectory={item.isDirectory}
-                  />
                 </div>
               </div>
             </FileContextMenu>
@@ -290,12 +283,6 @@ function GridView({
               </Link>
               <div className="mt-3 flex justify-end gap-2 border-t border-zinc-800 pt-3">
                 <RenameFileButton
-                  itemName={item.name}
-                  relativePath={item.relativePath}
-                  isDirectory={item.isDirectory}
-                />
-
-                <DeleteFileButton
                   itemName={item.name}
                   relativePath={item.relativePath}
                   isDirectory={item.isDirectory}

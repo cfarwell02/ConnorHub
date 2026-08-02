@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { Trash2 } from "lucide-react";
 
 const storageLinks = [
   { label: "Projects", icon: "📁", path: "Projects" },
@@ -111,6 +112,13 @@ export default function Sidebar({ pinnedPaths }: SidebarProps) {
             active={pathname === "/recent"}
           />
         </div>
+
+        <SidebarLink
+          href="/trash"
+          icon={<Trash2 size={16} />}
+          label="Trash"
+          active={pathname === "/trash"}
+        />
       </nav>
 
       <div className="border-t border-zinc-800 px-5 py-4">
@@ -125,7 +133,7 @@ export default function Sidebar({ pinnedPaths }: SidebarProps) {
 
 type SidebarLinkProps = {
   href: string;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   active?: boolean;
 };
@@ -141,7 +149,7 @@ function SidebarLink({ href, icon, label, active = false }: SidebarLinkProps) {
           : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
       }`}
     >
-      <span className="w-5 text-center text-base leading-none">{icon}</span>
+      <span className="flex w-5 items-center justify-center">{icon}</span>
       <span className="truncate">{label}</span>
     </Link>
   );
