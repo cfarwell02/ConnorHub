@@ -10,7 +10,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { ExternalLink, FolderInput, Pin, PinOff } from "lucide-react";
+import { ExternalLink, FolderInput, Pin, PinOff, CopyPlus } from "lucide-react";
 import MoveFileDialog from "@/components/files/MoveFileDialog";
 
 type FileContextMenuProps = {
@@ -157,6 +157,35 @@ export default function FileContextMenu({
     });
   }
 
+  function handleDuplicate() {
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/files/duplicate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            relativePath,
+          }),
+        });
+
+        const result = (await response.json()) as {
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(result.error ?? "The item could not be duplicated.");
+        }
+
+        setIsOpen(false);
+        router.refresh();
+      } catch (error) {
+        console.error("Unable to duplicate item:", error);
+      }
+    });
+  }
+
   return (
     <div onContextMenu={handleContextMenu}>
       {children}
@@ -195,6 +224,12 @@ export default function FileContextMenu({
               setIsOpen(false);
               setIsMoveDialogOpen(true);
             }}
+          />
+          <ContextMenuButton
+            icon={<CopyPlus size={16} />}
+            label="Duplicate"
+            disabled={isPending}
+            onClick={handleDuplicate}
           />
         </div>
       )}
