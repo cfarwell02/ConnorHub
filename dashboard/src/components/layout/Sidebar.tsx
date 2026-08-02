@@ -12,7 +12,11 @@ const storageLinks = [
   { label: "Archive", icon: "📦", path: "Archive" },
 ];
 
-export default function Sidebar() {
+type SidebarProps = {
+  pinnedPaths: string[];
+};
+
+export default function Sidebar({ pinnedPaths }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentStoragePath = searchParams.get("path");
@@ -45,6 +49,31 @@ export default function Sidebar() {
             active={pathname === "/files" && !currentStoragePath}
           />
         </div>
+
+        {pinnedPaths.length > 0 && (
+          <>
+            <div className="my-4 border-t border-zinc-800" />
+            <div>
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
+                Quick Access
+              </p>
+
+              <div className="space-y-1">
+                {pinnedPaths.map((pinnedPath) => (
+                  <SidebarLink
+                    key={pinnedPath}
+                    href={createPinnedUrl(pinnedPath)}
+                    icon="📌"
+                    label={getPinnedLabel(pinnedPath)}
+                    active={
+                      pathname === "/files" && currentStoragePath === pinnedPath
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="my-4 border-t border-zinc-800" />
 
@@ -116,4 +145,14 @@ function SidebarLink({ href, icon, label, active = false }: SidebarLinkProps) {
       <span className="truncate">{label}</span>
     </Link>
   );
+}
+
+function getPinnedLabel(relativePath: string): string {
+  const segments = relativePath.split("/").filter(Boolean);
+
+  return segments.at(-1) ?? relativePath;
+}
+
+function createPinnedUrl(relativePath: string): string {
+  return `/files?path=${encodeURIComponent(relativePath)}`;
 }

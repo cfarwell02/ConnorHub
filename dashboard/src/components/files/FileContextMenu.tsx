@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Pin, PinOff } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type FileContextMenuProps = {
   relativePath: string;
@@ -20,6 +21,7 @@ export default function FileContextMenu({
   const [isPending, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  const router = useRouter();
 
   useEffect(() => {
     function handleAnotherMenuOpened(event: Event) {
@@ -110,6 +112,7 @@ export default function FileContextMenu({
 
       setIsPinned(result.pinned);
       setIsOpen(false);
+      router.refresh();
     });
   }
 
