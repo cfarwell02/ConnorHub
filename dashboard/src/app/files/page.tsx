@@ -51,43 +51,45 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           <CreateFolderButton currentPath={currentPath} />
         </header>
 
-        <div className="mb-4 flex min-h-11 items-center rounded-xl border border-zinc-800 bg-zinc-900 px-4">
-          <nav
-            aria-label="Breadcrumb"
-            className="flex min-w-0 flex-wrap items-center gap-2 text-sm"
-          >
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-4 flex min-h-10 min-w-0 items-center overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 text-sm"
+        >
+          <ol className="flex min-w-max items-center">
             {breadcrumbs.map((breadcrumb, index) => {
               const isCurrent = index === breadcrumbs.length - 1;
 
               return (
-                <div
-                  key={breadcrumb.path}
-                  className="flex min-w-0 items-center gap-2"
-                >
+                <li key={breadcrumb.path} className="flex min-w-0 items-center">
                   {index > 0 && (
-                    <span className="shrink-0 text-zinc-700">›</span>
+                    <span
+                      aria-hidden="true"
+                      className="mx-2 shrink-0 text-zinc-700"
+                    >
+                      /
+                    </span>
                   )}
 
                   {isCurrent ? (
                     <span
                       aria-current="page"
-                      className="truncate font-medium text-zinc-200"
+                      className="max-w-48 truncate font-medium text-zinc-200"
                     >
                       {breadcrumb.name}
                     </span>
                   ) : (
                     <Link
                       href={createFilesUrl(breadcrumb.path)}
-                      className="truncate text-zinc-500 transition hover:text-zinc-100"
+                      className="max-w-48 truncate text-zinc-500 transition hover:text-zinc-100"
                     >
                       {breadcrumb.name}
                     </Link>
                   )}
-                </div>
+                </li>
               );
             })}
-          </nav>
-        </div>
+          </ol>
+        </nav>
 
         <FileUploader currentPath={currentPath} />
 
