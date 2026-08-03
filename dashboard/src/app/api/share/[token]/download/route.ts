@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import { NextResponse } from "next/server";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { Readable } from "node:stream";
+import path from "node:path";
 
 import { getShareToken } from "@/lib/share-tokens";
 import { resolveConnorHubPath } from "@/lib/server-data";
@@ -10,22 +11,25 @@ import { resolveConnorHubPath } from "@/lib/server-data";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type ShareRouteProps = {
+type ShareDownloadRouteProps = {
   params: Promise<{
     token: string;
   }>;
 };
 
-export async function GET(request: NextRequest, { params }: ShareRouteProps) {
-  let temporaryDirectory: string | null = null;
-
+export async function GET(
+  request: Request,
+  { params }: ShareDownloadRouteProps,
+) {
   try {
     const { token } = await params;
     const record = await getShareToken(token);
 
     if (!record) {
       return NextResponse.json(
-        { error: "This share has expired or does not exist." },
+        {
+          error: "This share has expired or does not exist.",
+        },
         { status: 404 },
       );
     }
@@ -34,87 +38,111 @@ export async function GET(request: NextRequest, { params }: ShareRouteProps) {
     const itemStats = await stat(absolutePath);
 
     if (!itemStats.isDirectory()) {
-      const contents = await readFile(absolutePath);
-      const fileName = path.basename(absolutePath);
-
-      return new NextResponse(contents, {
-        headers: {
-          "Content-Type": getContentType(fileName),
-          "Content-Length": String(itemStats.size),
-          "Content-Disposition": createContentDisposition(fileName),
-          "Cache-Control": "private, no-store",
-        },
-      });
+      return createFileStreamResponse(
+        absolutePath,
+        path.basename(absolutePath),
+        itemStats.size,
+      );
     }
 
-    temporaryDirectory = await mkdtemp(
-      path.join(os.tmpdir(), "connorhub-share-token-"),
+    return createFolderZipStreamResponse(
+      request,
+      absolutePath,
+      `${path.basename(absolutePath)}.zip`,
     );
-
-    const folderName = path.basename(absolutePath);
-    const zipName = `${folderName}.zip`;
-    const zipPath = path.join(temporaryDirectory, zipName);
-
-    await createZipArchive({
-      sourceDirectory: path.dirname(absolutePath),
-      folderName,
-      outputPath: zipPath,
-    });
-
-    const zipStats = await stat(zipPath);
-    const zipContents = await readFile(zipPath);
-
-    return new NextResponse(zipContents, {
-      headers: {
-        "Content-Type": "application/zip",
-        "Content-Length": String(zipStats.size),
-        "Content-Disposition": createContentDisposition(zipName),
-        "Cache-Control": "private, no-store",
-      },
-    });
   } catch (error) {
-    console.error("Unable to serve shared ConnorHub item:", error);
+    console.error("Unable to download shared ConnorHub item:", error);
 
     return NextResponse.json(
-      { error: "The shared item could not be downloaded." },
+      {
+        error: "The shared item could not be downloaded.",
+      },
       { status: 500 },
     );
-  } finally {
-    if (temporaryDirectory) {
-      await rm(temporaryDirectory, {
-        recursive: true,
-        force: true,
-      }).catch((error) => {
-        console.error("Unable to clean shared ZIP:", error);
-      });
-    }
   }
 }
 
-function createZipArchive({
-  sourceDirectory,
-  folderName,
-  outputPath,
-}: {
-  sourceDirectory: string;
-  folderName: string;
-  outputPath: string;
-}): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("zip", ["-r", "-q", outputPath, folderName], {
-      cwd: sourceDirectory,
-    });
+function createFileStreamResponse(
+  absolutePath: string,
+  fileName: string,
+  sizeBytes: number,
+): Response {
+  const nodeStream = createReadStream(absolutePath);
 
-    child.once("error", reject);
+  const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
 
-    child.once("close", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
+  return new Response(webStream, {
+    status: 200,
+    headers: {
+      "Content-Type": getContentType(fileName),
+      "Content-Length": String(sizeBytes),
+      "Content-Disposition": createContentDisposition(fileName),
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
+function createFolderZipStreamResponse(
+  request: Request,
+  absolutePath: string,
+  zipName: string,
+): Response {
+  const parentDirectory = path.dirname(absolutePath);
+  const folderName = path.basename(absolutePath);
+
+  const zipProcess = spawn("zip", ["-r", "-q", "-", folderName], {
+    cwd: parentDirectory,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  if (!zipProcess.stdout) {
+    zipProcess.kill();
+
+    throw new Error("The ZIP output stream could not be created.");
+  }
+
+  let stderr = "";
+
+  zipProcess.stderr?.setEncoding("utf8");
+  zipProcess.stderr?.on("data", (chunk: string) => {
+    stderr += chunk;
+  });
+
+  zipProcess.once("error", (error) => {
+    console.error("Unable to start ZIP process:", error);
+  });
+
+  zipProcess.once("close", (code) => {
+    if (code !== 0) {
+      console.error(
+        `ZIP process exited with code ${code ?? "unknown"}: ${stderr}`,
+      );
+    }
+  });
+
+  request.signal.addEventListener(
+    "abort",
+    () => {
+      if (!zipProcess.killed) {
+        zipProcess.kill("SIGTERM");
       }
+    },
+    { once: true },
+  );
 
-      reject(new Error(`zip exited with code ${code ?? "unknown"}.`));
-    });
+  const webStream = Readable.toWeb(
+    zipProcess.stdout,
+  ) as ReadableStream<Uint8Array>;
+
+  return new Response(webStream, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": createContentDisposition(zipName),
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }
 
