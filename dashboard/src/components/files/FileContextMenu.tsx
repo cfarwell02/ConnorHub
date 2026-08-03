@@ -26,6 +26,7 @@ type FileContextMenuProps = {
   itemName: string;
   initialPinned: boolean;
   children: ReactNode;
+  selectedPaths: string[];
 };
 
 type MenuPosition = {
@@ -39,6 +40,7 @@ export default function FileContextMenu({
   itemName,
   initialPinned,
   children,
+  selectedPaths,
 }: FileContextMenuProps) {
   const router = useRouter();
   const menuId = useId();
@@ -196,13 +198,13 @@ export default function FileContextMenu({
   function handleMoveToTrash() {
     startTransition(async () => {
       try {
-        const response = await fetch("/api/files/trash", {
+        const response = await fetch("/api/files/trash-many", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            relativePath,
+            relativePaths: selectedPaths,
           }),
         });
 
@@ -212,14 +214,14 @@ export default function FileContextMenu({
 
         if (!response.ok) {
           throw new Error(
-            result.error ?? "The item could not be moved to Trash.",
+            result.error ?? "The selected items could not be moved to Trash.",
           );
         }
 
         setIsOpen(false);
         router.refresh();
       } catch (error) {
-        console.error("Unable to move item to Trash:", error);
+        console.error("Unable to move selected items to Trash:", error);
       }
     });
   }
@@ -273,7 +275,11 @@ export default function FileContextMenu({
 
           <ContextMenuButton
             icon={<Trash2 size={16} />}
-            label="Move to Trash"
+            label={
+              selectedPaths.length > 1
+                ? `Move ${selectedPaths.length} Items to Trash`
+                : "Move to Trash"
+            }
             disabled={isPending}
             onClick={handleMoveToTrash}
             destructive
@@ -281,8 +287,10 @@ export default function FileContextMenu({
         </div>
       )}
       <MoveFileDialog
-        itemName={itemName}
-        relativePath={relativePath}
+        itemName={
+          selectedPaths.length > 1 ? `${selectedPaths.length} items` : itemName
+        }
+        sourcePaths={selectedPaths}
         isOpen={isMoveDialogOpen}
         onClose={() => setIsMoveDialogOpen(false)}
       />

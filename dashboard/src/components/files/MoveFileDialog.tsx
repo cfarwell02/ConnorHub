@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation";
 
 type MoveFileDialogProps = {
   itemName: string;
-  relativePath: string;
+  sourcePaths: string[];
   isOpen: boolean;
   onClose: () => void;
 };
 
 export default function MoveFileDialog({
   itemName,
-  relativePath,
+  sourcePaths,
   isOpen,
   onClose,
 }: MoveFileDialogProps) {
@@ -37,13 +37,13 @@ export default function MoveFileDialog({
 
     startTransition(async () => {
       try {
-        const response = await fetch("/api/files/move", {
+        const response = await fetch("/api/files/move-many", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            sourcePath: relativePath,
+            sourcePaths,
             destinationFolder,
           }),
         });
@@ -69,8 +69,18 @@ export default function MoveFileDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4">
-      <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl"
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+      >
         <div className="flex items-start justify-between border-b border-zinc-800 px-5 py-4">
           <div>
             <h2 className="font-semibold text-zinc-100">Move “{itemName}”</h2>

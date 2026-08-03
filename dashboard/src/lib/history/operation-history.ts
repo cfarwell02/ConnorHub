@@ -42,6 +42,21 @@ export type FileOperation =
       createdAt: string;
       fromPath: string;
       toPath: string;
+    }
+  | {
+      id: string;
+      type: "move-many";
+      createdAt: string;
+      moves: Array<{
+        fromPath: string;
+        toPath: string;
+      }>;
+    }
+  | {
+      id: string;
+      type: "trash-many";
+      createdAt: string;
+      trashRecordIds: string[];
     };
 
 export type NewFileOperation =
@@ -62,6 +77,17 @@ export type NewFileOperation =
       type: "rename";
       fromPath: string;
       toPath: string;
+    }
+  | {
+      type: "move-many";
+      moves: Array<{
+        fromPath: string;
+        toPath: string;
+      }>;
+    }
+  | {
+      type: "trash-many";
+      trashRecordIds: string[];
     };
 
 export async function pushOperation(

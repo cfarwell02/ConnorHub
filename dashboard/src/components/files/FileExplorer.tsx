@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import {
+  useEffect,
+  useCallback,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import {
   Archive,
   Code2,
@@ -15,6 +20,7 @@ import {
   List,
   Search,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import RenameFileButton from "@/components/files/RenameFileButton";
 import type { FileBrowserItem } from "@/types/files";
@@ -69,8 +75,101 @@ export default function FileExplorer({
       });
   }, [items, query, sortBy]);
 
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const router = useRouter();
+  const [isTrashPending, startTrashTransition] = useTransition();
+
+  function handleSelect(relativePath: string, additive: boolean) {
+    setSelectedPaths((current) => {
+      const next = new Set(additive ? current : []);
+
+      if (next.has(relativePath)) {
+        next.delete(relativePath);
+      } else {
+        next.add(relativePath);
+      }
+
+      return next;
+    });
+  }
+
+  const moveSelectedToTrash = useCallback(() => {
+    if (selectedPaths.size === 0 || isTrashPending) {
+      return;
+    }
+
+    const pathsToTrash = Array.from(selectedPaths);
+
+    startTrashTransition(async () => {
+      try {
+        const response = await fetch("/api/files/trash-many", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            relativePaths: pathsToTrash,
+          }),
+        });
+
+        const result = (await response.json()) as {
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ?? "The selected items could not be moved to Trash.",
+          );
+        }
+
+        setSelectedPaths(new Set());
+        router.refresh();
+      } catch (error) {
+        console.error("Unable to move selected items to Trash:", error);
+      }
+    });
+  }, [isTrashPending, router, selectedPaths]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target;
+
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+
+      if (isTyping) {
+        return;
+      }
+
+      const isDeleteKey = event.key === "Delete" || event.key === "Backspace";
+
+      if (!isDeleteKey || selectedPaths.size === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      moveSelectedToTrash();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [moveSelectedToTrash, selectedPaths.size]);
+
   return (
-    <>
+    <div
+      onClick={() => {
+        setSelectedPaths(new Set());
+      }}
+    >
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full lg:max-w-md">
           <Search
@@ -139,21 +238,40 @@ export default function FileExplorer({
       {visibleItems.length === 0 ? (
         <EmptyState hasQuery={query.trim().length > 0} />
       ) : viewMode === "list" ? (
-        <ListView items={visibleItems} pinnedPaths={pinnedPaths} />
+        <ListView
+          items={visibleItems}
+          pinnedPaths={pinnedPaths}
+          selectedPaths={selectedPaths}
+          onSelect={handleSelect}
+          onClearSelection={() => setSelectedPaths(new Set())}
+        />
       ) : (
-        <GridView items={visibleItems} pinnedPaths={pinnedPaths} />
+        <GridView
+          items={visibleItems}
+          pinnedPaths={pinnedPaths}
+          selectedPaths={selectedPaths}
+          onSelect={handleSelect}
+          onClearSelection={() => setSelectedPaths(new Set())}
+        />
       )}
-    </>
+    </div>
   );
 }
 
 function ListView({
   items,
   pinnedPaths,
+  selectedPaths,
+  onSelect,
+  onClearSelection,
 }: {
   items: FileBrowserItem[];
   pinnedPaths: string[];
+  selectedPaths: Set<string>;
+  onSelect: (relativePath: string, additive: boolean) => void;
+  onClearSelection: () => void;
 }) {
+  const router = useRouter();
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
       <div className="grid grid-cols-[minmax(0,1fr)_70px_170px] border-b border-zinc-800 px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-600 sm:grid-cols-[minmax(0,1fr)_110px_180px_220px]">
@@ -169,26 +287,40 @@ function ListView({
             ? createFilesUrl(item.relativePath)
             : createPreviewUrl(item.relativePath);
 
+          const isSelected = selectedPaths.has(item.relativePath);
+
           const row = (
             <FileContextMenu
               relativePath={item.relativePath}
               href={href}
               itemName={item.name}
               initialPinned={pinnedPaths.includes(item.relativePath)}
+              selectedPaths={
+                selectedPaths.has(item.relativePath)
+                  ? Array.from(selectedPaths)
+                  : [item.relativePath]
+              }
             >
               <div
                 draggable
+                onClick={(event) => {
+                  event.stopPropagation();
+
+                  onSelect(item.relativePath, event.metaKey || event.ctrlKey);
+                }}
                 onDragStart={(event) => {
                   event.currentTarget.classList.add("opacity-50");
-                  handleDragStart(event, item.relativePath);
+                  handleDragStart(event, item.relativePath, selectedPaths);
                 }}
                 onDragEnd={handleDragEnd}
-                className="grid grid-cols-[minmax(0,1fr)_70px_170px] cursor-grab items-center transition active:cursor-grabbing hover:bg-zinc-800/45 sm:grid-cols-[minmax(0,1fr)_110px_180px_220px]"
+                className={`grid grid-cols-[minmax(0,1fr)_70px_170px] cursor-default items-center transition sm:grid-cols-[minmax(0,1fr)_110px_180px_220px] ${
+                  isSelected ? "bg-zinc-700/60" : "hover:bg-zinc-800/45"
+                }`}
               >
                 {" "}
-                <Link
-                  href={href}
-                  className="flex min-w-0 items-center gap-3 px-4 py-3.5"
+                <div
+                  onDoubleClick={() => router.push(href)}
+                  className="flex min-w-0 cursor-default items-center gap-3 px-4 py-3.5"
                 >
                   <FileIcon item={item} />
 
@@ -201,7 +333,7 @@ function ListView({
                       {getDisplayType(item)}
                     </p>
                   </div>
-                </Link>
+                </div>
                 <span className="px-2 text-right text-sm text-zinc-500">
                   {item.isDirectory ? "—" : formatBytes(item.sizeBytes)}
                 </span>
@@ -223,6 +355,7 @@ function ListView({
             <FolderDropTarget
               key={item.relativePath}
               destinationPath={item.relativePath}
+              onMoveComplete={onClearSelection}
             >
               {row}
             </FolderDropTarget>
@@ -238,10 +371,17 @@ function ListView({
 function GridView({
   items,
   pinnedPaths,
+  selectedPaths,
+  onSelect,
+  onClearSelection,
 }: {
   items: FileBrowserItem[];
   pinnedPaths: string[];
+  selectedPaths: Set<string>;
+  onSelect: (relativePath: string, additive: boolean) => void;
+  onClearSelection: () => void;
 }) {
+  const router = useRouter();
   return (
     <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {items.map((item) => {
@@ -249,24 +389,41 @@ function GridView({
           ? createFilesUrl(item.relativePath)
           : createPreviewUrl(item.relativePath);
 
+        const isSelected = selectedPaths.has(item.relativePath);
+
         const card = (
           <FileContextMenu
             relativePath={item.relativePath}
             href={href}
             itemName={item.name}
             initialPinned={pinnedPaths.includes(item.relativePath)}
+            selectedPaths={
+              selectedPaths.has(item.relativePath)
+                ? Array.from(selectedPaths)
+                : [item.relativePath]
+            }
           >
             <div
               draggable
+              onClick={(event) => {
+                onSelect(item.relativePath, event.metaKey || event.ctrlKey);
+              }}
               onDragStart={(event) => {
                 event.currentTarget.classList.add("opacity-50");
-                handleDragStart(event, item.relativePath);
+                handleDragStart(event, item.relativePath, selectedPaths);
               }}
               onDragEnd={handleDragEnd}
-              className="group relative cursor-grab rounded-xl border border-zinc-800 bg-zinc-900 p-3 transition active:cursor-grabbing hover:border-zinc-700 hover:bg-zinc-800/60"
+              className={`group relative cursor-grab rounded-xl border p-3 transition active:cursor-grabbing ${
+                isSelected
+                  ? "border-zinc-500 bg-zinc-700/60 ring-1 ring-zinc-500"
+                  : "border-zinc-800 bg-zinc-900 hover:border-zinc-700 hover:bg-zinc-800/60"
+              }`}
             >
               {" "}
-              <Link href={href} className="block">
+              <div
+                onDoubleClick={() => router.push(href)}
+                className="block cursor-default"
+              >
                 <div className="flex h-24 items-center justify-center rounded-lg bg-zinc-950/60">
                   <FileIcon item={item} size={38} />
                 </div>
@@ -280,7 +437,7 @@ function GridView({
                     {item.isDirectory ? "Folder" : formatBytes(item.sizeBytes)}
                   </p>
                 </div>
-              </Link>
+              </div>
               <div className="mt-3 flex justify-end gap-2 border-t border-zinc-800 pt-3">
                 <RenameFileButton
                   itemName={item.name}
@@ -296,6 +453,7 @@ function GridView({
           <FolderDropTarget
             key={item.relativePath}
             destinationPath={item.relativePath}
+            onMoveComplete={onClearSelection}
           >
             {card}
           </FolderDropTarget>
@@ -483,12 +641,54 @@ function formatBytes(bytes: number): string {
 
 function handleDragStart(
   event: React.DragEvent<HTMLElement>,
-  relativePath: string,
+  draggedPath: string,
+  selectedPaths: Set<string>,
 ) {
   event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("application/x-connorhub-path", relativePath);
+
+  const pathsToMove = selectedPaths.has(draggedPath)
+    ? Array.from(selectedPaths)
+    : [draggedPath];
+
+  event.dataTransfer.setData(
+    "application/x-connorhub-paths",
+    JSON.stringify(pathsToMove),
+  );
+
+  const dragPreview = document.createElement("div");
+
+  dragPreview.textContent =
+    pathsToMove.length === 1
+      ? getDraggedItemName(pathsToMove[0])
+      : `${pathsToMove.length} items`;
+
+  Object.assign(dragPreview.style, {
+    position: "fixed",
+    left: "-9999px",
+    top: "-9999px",
+    padding: "8px 12px",
+    borderRadius: "8px",
+    background: "#27272a",
+    color: "#f4f4f5",
+    fontSize: "13px",
+    fontWeight: "500",
+    border: "1px solid #52525b",
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
+    pointerEvents: "none",
+  });
+
+  document.body.appendChild(dragPreview);
+  event.dataTransfer.setDragImage(dragPreview, 16, 16);
+
+  requestAnimationFrame(() => {
+    dragPreview.remove();
+  });
 }
 
 function handleDragEnd(event: React.DragEvent<HTMLElement>) {
   event.currentTarget.classList.remove("opacity-50");
+}
+
+function getDraggedItemName(relativePath: string): string {
+  return relativePath.split("/").filter(Boolean).at(-1) ?? relativePath;
 }
