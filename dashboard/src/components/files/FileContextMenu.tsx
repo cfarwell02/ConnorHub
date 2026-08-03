@@ -17,8 +17,10 @@ import {
   PinOff,
   CopyPlus,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import MoveFileDialog from "@/components/files/MoveFileDialog";
+import RenameFileDialog from "./RenameFileDialog";
 
 type FileContextMenuProps = {
   href: string;
@@ -27,6 +29,7 @@ type FileContextMenuProps = {
   initialPinned: boolean;
   children: ReactNode;
   selectedPaths: string[];
+  isDirectory: boolean;
 };
 
 type MenuPosition = {
@@ -41,6 +44,7 @@ export default function FileContextMenu({
   initialPinned,
   children,
   selectedPaths,
+  isDirectory,
 }: FileContextMenuProps) {
   const router = useRouter();
   const menuId = useId();
@@ -53,6 +57,7 @@ export default function FileContextMenu({
     y: 0,
   });
   const [isPending, startTransition] = useTransition();
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
 
   useEffect(() => {
     function closeMenu() {
@@ -258,6 +263,14 @@ export default function FileContextMenu({
             onClick={handleTogglePinned}
           />
           <ContextMenuButton
+            icon={<Pencil size={16} />}
+            label="Rename"
+            onClick={() => {
+              setIsOpen(false);
+              setIsRenameDialogOpen(true);
+            }}
+          />
+          <ContextMenuButton
             icon={<FolderInput size={16} />}
             label="Move..."
             onClick={() => {
@@ -293,6 +306,13 @@ export default function FileContextMenu({
         sourcePaths={selectedPaths}
         isOpen={isMoveDialogOpen}
         onClose={() => setIsMoveDialogOpen(false)}
+      />
+      <RenameFileDialog
+        itemName={itemName}
+        relativePath={relativePath}
+        isDirectory={isDirectory}
+        isOpen={isRenameDialogOpen}
+        onClose={() => setIsRenameDialogOpen(false)}
       />
     </div>
   );

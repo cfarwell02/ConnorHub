@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import RenameFileButton from "@/components/files/RenameFileButton";
 import type { FileBrowserItem } from "@/types/files";
 import FileContextMenu from "./FileContextMenu";
 import FolderDropTarget from "./FolderDropTarget";
@@ -300,6 +299,7 @@ function ListView({
                   ? Array.from(selectedPaths)
                   : [item.relativePath]
               }
+              isDirectory={item.isDirectory}
             >
               <div
                 draggable
@@ -340,13 +340,6 @@ function ListView({
                 <span className="hidden px-2 text-right text-sm text-zinc-500 sm:block">
                   {formatModifiedDate(item.modifiedAt)}
                 </span>
-                <div className="flex items-center justify-end gap-1 px-4 py-3">
-                  <RenameFileButton
-                    itemName={item.name}
-                    relativePath={item.relativePath}
-                    isDirectory={item.isDirectory}
-                  />
-                </div>
               </div>
             </FileContextMenu>
           );
@@ -402,6 +395,7 @@ function GridView({
                 ? Array.from(selectedPaths)
                 : [item.relativePath]
             }
+            isDirectory={item.isDirectory}
           >
             <div
               draggable
@@ -437,13 +431,6 @@ function GridView({
                     {item.isDirectory ? "Folder" : formatBytes(item.sizeBytes)}
                   </p>
                 </div>
-              </div>
-              <div className="mt-3 flex justify-end gap-2 border-t border-zinc-800 pt-3">
-                <RenameFileButton
-                  itemName={item.name}
-                  relativePath={item.relativePath}
-                  isDirectory={item.isDirectory}
-                />
               </div>
             </div>
           </FileContextMenu>

@@ -114,6 +114,26 @@ export async function POST() {
         });
       }
 
+      case "rename": {
+        const currentAbsolutePath = path.join(
+          CONNORHUB_ROOT,
+          ...operation.toPath.split("/"),
+        );
+
+        const originalAbsolutePath = path.join(
+          CONNORHUB_ROOT,
+          ...operation.fromPath.split("/"),
+        );
+
+        await rename(currentAbsolutePath, originalAbsolutePath);
+
+        return NextResponse.json({
+          success: true,
+          operation: "rename",
+          restoredPath: operation.fromPath,
+        });
+      }
+
       default: {
         await restoreOperation(operation);
 

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { realpath, rename, stat } from "node:fs/promises";
 import { NextResponse } from "next/server";
+import { pushOperation } from "@/lib/history/operation-history";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +86,17 @@ export async function PATCH(request: Request) {
       .relative(CONNORHUB_ROOT, destinationPath)
       .split(path.sep)
       .join("/");
+
+    const originalRelativePath = path
+      .relative(CONNORHUB_ROOT, sourcePath)
+      .split(path.sep)
+      .join("/");
+
+    await pushOperation({
+      type: "rename",
+      fromPath: originalRelativePath,
+      toPath: relativePath,
+    });
 
     return NextResponse.json({
       success: true,
