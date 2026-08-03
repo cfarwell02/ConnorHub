@@ -23,6 +23,7 @@ export default function ShareDialog({
   const [isPreparing, setIsPreparing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
 
   if (!isOpen || typeof document === "undefined") {
     return null;
@@ -88,14 +89,35 @@ export default function ShareDialog({
 
     setIsPreparing(true);
     setErrorMessage(null);
+    setQrCodeUrl(null);
+    setQrExpiresAt(null);
 
     try {
-      const transferUrl = new URL(
-        getShareUrl(),
-        window.location.origin,
-      ).toString();
+      const response = await fetch("/api/share/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          relativePath,
+          lifetimeMinutes: 5,
+        }),
+      });
 
-      const generatedQrCode = await QRCode.toDataURL(transferUrl, {
+      const result = (await response.json()) as {
+        shareUrl?: string;
+        expiresAt?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !result.shareUrl) {
+        throw new Error(
+          result.error ?? "The temporary share could not be created.",
+        );
+      }
+      setQrExpiresAt(result.expiresAt ?? null);
+
+      const generatedQrCode = await QRCode.toDataURL(result.shareUrl, {
         width: 280,
         margin: 2,
       });
@@ -167,6 +189,13 @@ export default function ShareDialog({
     }
   }
 
+  function handleClose() {
+    setQrCodeUrl(null);
+    setQrExpiresAt(null);
+    setErrorMessage(null);
+    onClose();
+  }
+
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4"
@@ -174,7 +203,7 @@ export default function ShareDialog({
         event.stopPropagation();
 
         if (event.target === event.currentTarget) {
-          onClose();
+          handleClose();
         }
       }}
     >
@@ -199,16 +228,17 @@ export default function ShareDialog({
                 ? "ConnorHub will prepare this folder as a ZIP file."
                 : "Choose how you want to share this file."}
             </p>
+
+            {!window.isSecureContext && (
+              <p className="mt-2 text-xs text-amber-300">
+                Native sharing requires ConnorHub to be opened over HTTPS.
+              </p>
+            )}
           </div>
-          {typeof window !== "undefined" && !window.isSecureContext && (
-            <p className="mt-2 text-xs text-amber-300">
-              Native sharing requires ConnorHub to be opened over HTTPS.
-            </p>
-          )}
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close share dialog"
             className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200"
           >
@@ -251,8 +281,18 @@ export default function ShareDialog({
               />
 
               <p className="mt-3 text-center text-xs text-zinc-600">
-                Scan using your phone camera.
+                Scan with your phone camera to download {sharedName}.
               </p>
+
+              {qrExpiresAt && (
+                <p className="mt-1 text-center text-xs text-zinc-500">
+                  Expires at{" "}
+                  {new Date(qrExpiresAt).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              )}
             </div>
           )}
           {errorMessage && (
@@ -263,7 +303,7 @@ export default function ShareDialog({
         <footer className="flex justify-end border-t border-zinc-800 px-5 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded-lg px-4 py-2 text-sm text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
           >
             Cancel

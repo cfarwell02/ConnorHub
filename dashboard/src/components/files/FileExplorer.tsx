@@ -600,14 +600,55 @@ function createPreviewUrl(relativePath: string): string {
   return `/preview?path=${encodeURIComponent(relativePath)}`;
 }
 
-function formatModifiedDate(value: Date): string {
-  return new Date(value).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
+function formatModifiedDate(value: Date | string): string {
+  const date = new Date(value);
+
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
     year: "numeric",
-    hour: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
+
+  const parts = formatter.formatToParts(date);
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  const monthNumber = Number(getPart("month"));
+  const day = Number(getPart("day"));
+  const year = getPart("year");
+
+  let hour = Number(getPart("hour"));
+  const minute = getPart("minute");
+
+  if (hour === 24) {
+    hour = 0;
+  }
+
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  const month = monthNames[monthNumber - 1] ?? "";
+
+  return `${month} ${day}, ${year}, ${displayHour}:${minute} ${period}`;
 }
 
 function formatBytes(bytes: number): string {
