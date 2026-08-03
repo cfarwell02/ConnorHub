@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { CONNORHUB_ROOT, resolveConnorHubPath } from "@/lib/server-data";
+import { pushOperation } from "@/lib/history/operation-history";
 
 export type TrashRecord = {
   id: string;
@@ -91,6 +92,11 @@ export async function POST(request: NextRequest) {
 
     records.push(record);
     await writeTrashRecords(records);
+
+    await pushOperation({
+      type: "trash",
+      trashRecordId: record.id,
+    });
 
     return NextResponse.json({
       success: true,

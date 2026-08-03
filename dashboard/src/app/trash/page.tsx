@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { CONNORHUB_ROOT } from "@/lib/server-data";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import RestoreTrashButton from "@/components/files/RestoreTrashButton";
 
 type TrashRecord = {
   id: string;
@@ -49,17 +50,18 @@ export default async function TrashPage() {
           </section>
         ) : (
           <section className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-            <div className="grid grid-cols-[minmax(0,1fr)_180px_160px] border-b border-zinc-800 px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-600">
+            <div className="grid grid-cols-[minmax(0,1fr)_180px_160px_140px] border-b border-zinc-800 px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-600">
               <span>Name</span>
               <span>Original location</span>
               <span className="text-right">Deleted</span>
+              <span className="text-right">Actions</span>
             </div>
 
             <div className="divide-y divide-zinc-800/80">
               {records.map((record) => (
                 <div
                   key={record.id}
-                  className="grid grid-cols-[minmax(0,1fr)_180px_160px] items-center px-4 py-3"
+                  className="grid grid-cols-[minmax(0,1fr)_180px_160px_140px] items-center gap-3 px-4 py-3"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-zinc-200">
@@ -74,6 +76,13 @@ export default async function TrashPage() {
                   <p className="text-right text-sm text-zinc-500">
                     {new Date(record.deletedAt).toLocaleString()}
                   </p>
+
+                  <div className="flex justify-end">
+                    <RestoreTrashButton
+                      recordId={record.id}
+                      itemName={getItemName(record.originalPath)}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
