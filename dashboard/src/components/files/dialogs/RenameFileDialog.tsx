@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type SyntheticEvent,
-} from "react";
+import { useCallback, useRef, useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 

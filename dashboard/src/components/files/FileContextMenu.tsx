@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type MouseEvent,
+  type PointerEvent,
   type ReactNode,
   useEffect,
   useId,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -18,9 +20,11 @@ import {
   CopyPlus,
   Trash2,
   Pencil,
+  Share2,
 } from "lucide-react";
-import MoveFileDialog from "@/components/files/MoveFileDialog";
-import RenameFileDialog from "./RenameFileDialog";
+import MoveFileDialog from "./dialogs/MoveFileDialog";
+import RenameFileDialog from "./dialogs/RenameFileDialog";
+import ShareDialog from "./dialogs/ShareDialog";
 
 type FileContextMenuProps = {
   href: string;
@@ -51,13 +55,18 @@ export default function FileContextMenu({
 
   const [isOpen, setIsOpen] = useState(false);
   const [isPinned, setIsPinned] = useState(initialPinned);
-  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+
   const [position, setPosition] = useState<MenuPosition>({
     x: 0,
     y: 0,
   });
   const [isPending, startTransition] = useTransition();
+  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const longPressTriggeredRef = useRef(false);
 
   useEffect(() => {
     function closeMenu() {
@@ -107,10 +116,7 @@ export default function FileContextMenu({
     };
   }, [menuId]);
 
-  function handleContextMenu(event: MouseEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-
+  function openMenuAtPosition(x: number, y: number) {
     window.dispatchEvent(
       new CustomEvent("connorhub:context-menu-opened", {
         detail: menuId,
@@ -118,27 +124,28 @@ export default function FileContextMenu({
     );
 
     const menuWidth = 224;
-    const menuHeight = 112;
+    const menuHeight = 320;
     const viewportPadding = 12;
 
     setPosition({
       x: Math.max(
         viewportPadding,
-        Math.min(
-          event.clientX,
-          window.innerWidth - menuWidth - viewportPadding,
-        ),
+        Math.min(x, window.innerWidth - menuWidth - viewportPadding),
       ),
       y: Math.max(
         viewportPadding,
-        Math.min(
-          event.clientY,
-          window.innerHeight - menuHeight - viewportPadding,
-        ),
+        Math.min(y, window.innerHeight - menuHeight - viewportPadding),
       ),
     });
 
     setIsOpen(true);
+  }
+
+  function handleContextMenu(event: MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    openMenuAtPosition(event.clientX, event.clientY);
   }
 
   function handleTogglePinned() {
@@ -231,8 +238,49 @@ export default function FileContextMenu({
     });
   }
 
+  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "touch") {
+      return;
+    }
+
+    longPressTriggeredRef.current = false;
+
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      longPressTimerRef.current = null;
+
+      window.getSelection()?.removeAllRanges();
+      openMenuAtPosition(event.clientX, event.clientY);
+
+      setTimeout(() => {
+        longPressTriggeredRef.current = false;
+      }, 0);
+    }, 550);
+  }
+
+  function cancelLongPress() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
   return (
-    <div onContextMenu={handleContextMenu}>
+    <div
+      onContextMenu={handleContextMenu}
+      onPointerDown={handlePointerDown}
+      onPointerUp={cancelLongPress}
+      onPointerCancel={cancelLongPress}
+      onPointerMove={cancelLongPress}
+      onPointerLeave={cancelLongPress}
+      className="select-none"
+      style={{
+        WebkitTouchCallout: "none",
+        WebkitUserSelect: "none",
+        userSelect: "none",
+        touchAction: "pan-y",
+      }}
+    >
       {children}
 
       {isOpen && (
@@ -253,15 +301,17 @@ export default function FileContextMenu({
             label="Open"
             onClick={() => setIsOpen(false)}
           />
+          <ContextMenuButton
+            icon={<Share2 size={16} />}
+            label="Share..."
+            onClick={() => {
+              setIsOpen(false);
+              setIsShareDialogOpen(true);
+            }}
+          />
 
           <div className="my-1 border-t border-zinc-800" />
 
-          <ContextMenuButton
-            icon={isPinned ? <PinOff size={16} /> : <Pin size={16} />}
-            label={isPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
-            disabled={isPending}
-            onClick={handleTogglePinned}
-          />
           <ContextMenuButton
             icon={<Pencil size={16} />}
             label="Rename"
@@ -283,6 +333,14 @@ export default function FileContextMenu({
             label="Duplicate"
             disabled={isPending}
             onClick={handleDuplicate}
+          />
+          <div className="my-1 border-t border-zinc-800" />
+
+          <ContextMenuButton
+            icon={isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+            label={isPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+            disabled={isPending}
+            onClick={handleTogglePinned}
           />
           <div className="my-1 border-t border-zinc-800" />
 
@@ -313,6 +371,13 @@ export default function FileContextMenu({
         isDirectory={isDirectory}
         isOpen={isRenameDialogOpen}
         onClose={() => setIsRenameDialogOpen(false)}
+      />
+      <ShareDialog
+        itemName={itemName}
+        relativePath={relativePath}
+        isDirectory={isDirectory}
+        isOpen={isShareDialogOpen}
+        onClose={() => setIsShareDialogOpen(false)}
       />
     </div>
   );
