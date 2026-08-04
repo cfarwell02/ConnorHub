@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SidebarShell from "@/components/layout/SidebarShell";
 import FileKeyboardShortcuts from "@/components/files/FileKeyboardShortcuts";
+import UniversalSearchDialog from "@/components/search/UniversalSearchDialog";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,7 +32,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-zinc-950 text-zinc-100">
         <FileKeyboardShortcuts />
-
+        <UniversalSearchDialog />
         <div className="flex min-h-screen">
           <SidebarShell />
 
