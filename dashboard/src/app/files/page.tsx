@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { getDirectoryContents } from "@/lib/server-data";
 import type { FileBrowserItem } from "@/types/files";
-import FileUploader from "@/components/files/FileUploader";
-import FileExplorer from "@/components/files/FileExplorer";
+import FilesWorkspace from "@/components/files/FilesWorkspace";
 import CreateFolderButton from "@/components/files/CreateFolderButton";
 import { getPinnedPaths } from "@/lib/file-metadata";
 
@@ -91,14 +90,16 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           </ol>
         </nav>
 
-        <FileUploader currentPath={currentPath} />
-
         {errorMessage ? (
           <div className="rounded-2xl border border-red-900/60 bg-red-950/30 p-6 text-sm text-red-300">
             {errorMessage}
           </div>
         ) : (
-          <FileExplorer items={items} pinnedPaths={pinnedPaths} />
+          <FilesWorkspace
+            currentPath={currentPath}
+            items={items}
+            pinnedPaths={pinnedPaths}
+          />
         )}
       </div>
     </main>

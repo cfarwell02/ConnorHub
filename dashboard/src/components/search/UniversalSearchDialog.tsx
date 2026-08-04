@@ -1,6 +1,15 @@
 "use client";
 
-import { File, Folder, Loader2, Search, X } from "lucide-react";
+import {
+  CheckSquare,
+  File,
+  Folder,
+  Link2,
+  Loader2,
+  Search,
+  StickyNote,
+  X,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -10,8 +19,16 @@ type SearchResult = {
   name: string;
   relativePath: string;
   parentPath: string;
-  type: "file" | "folder";
+  type:
+    | "file"
+    | "folder"
+    | "workspace-note"
+    | "workspace-task"
+    | "workspace-link";
   extension: string | null;
+  sourceFolderPath?: string;
+  matchedText?: string;
+  url?: string;
 };
 
 type SearchResponse = {
@@ -40,6 +57,20 @@ export default function UniversalSearchDialog() {
 
   function openResult(result: SearchResult) {
     closeDialog();
+
+    if (result.type === "workspace-link" && result.url) {
+      window.open(result.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (result.type === "workspace-note" || result.type === "workspace-task") {
+      router.push(
+        `/files?path=${encodeURIComponent(
+          result.sourceFolderPath ?? result.relativePath,
+        )}&workspace=open`,
+      );
+      return;
+    }
 
     if (result.type === "folder") {
       router.push(`/files?path=${encodeURIComponent(result.relativePath)}`);
@@ -259,11 +290,7 @@ export default function UniversalSearchDialog() {
                     }`}
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-500">
-                      {result.type === "folder" ? (
-                        <Folder size={19} />
-                      ) : (
-                        <File size={19} />
-                      )}
+                      <SearchResultIcon type={result.type} />
                     </span>
 
                     <span className="min-w-0 flex-1">
@@ -272,14 +299,12 @@ export default function UniversalSearchDialog() {
                       </span>
 
                       <span className="mt-0.5 block truncate text-xs text-zinc-600">
-                        {result.parentPath || "ConnorHub"}
+                        {getSearchResultSubtitle(result)}
                       </span>
                     </span>
 
                     <span className="shrink-0 text-xs text-zinc-600">
-                      {result.type === "folder"
-                        ? "Folder"
-                        : (result.extension?.toUpperCase() ?? "File")}
+                      {getSearchResultLabel(result)}
                     </span>
                   </button>
                 );
@@ -305,4 +330,58 @@ function SearchEmptyState({ message }: { message: string }) {
       <p className="text-sm text-zinc-600">{message}</p>
     </div>
   );
+}
+
+function SearchResultIcon({ type }: { type: SearchResult["type"] }) {
+  switch (type) {
+    case "folder":
+      return <Folder size={19} />;
+
+    case "workspace-note":
+      return <StickyNote size={19} />;
+
+    case "workspace-task":
+      return <CheckSquare size={19} />;
+
+    case "workspace-link":
+      return <Link2 size={19} />;
+
+    default:
+      return <File size={19} />;
+  }
+}
+
+function getSearchResultSubtitle(result: SearchResult): string {
+  switch (result.type) {
+    case "workspace-note":
+      return `Notes · ${result.sourceFolderPath || "ConnorHub"}`;
+
+    case "workspace-task":
+      return `Task · ${result.sourceFolderPath || "ConnorHub"}`;
+
+    case "workspace-link":
+      return `Link · ${result.sourceFolderPath || "ConnorHub"}`;
+
+    default:
+      return result.parentPath || "ConnorHub";
+  }
+}
+
+function getSearchResultLabel(result: SearchResult): string {
+  switch (result.type) {
+    case "folder":
+      return "Folder";
+
+    case "workspace-note":
+      return "Notes";
+
+    case "workspace-task":
+      return "Task";
+
+    case "workspace-link":
+      return "Link";
+
+    default:
+      return result.extension?.toUpperCase() ?? "File";
+  }
 }
