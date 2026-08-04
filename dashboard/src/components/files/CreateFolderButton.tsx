@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type CreateFolderButtonProps = {
@@ -17,6 +17,16 @@ export default function CreateFolderButton({
   const [folderName, setFolderName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const closeModal = useCallback(() => {
+    if (isCreating) {
+      return;
+    }
+
+    setIsOpen(false);
+    setFolderName("");
+    setErrorMessage(null);
+  }, [isCreating]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -36,7 +46,7 @@ export default function CreateFolderButton({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, isCreating]);
+  }, [isOpen, isCreating, closeModal]);
 
   function openModal() {
     setFolderName("");
@@ -44,17 +54,7 @@ export default function CreateFolderButton({
     setIsOpen(true);
   }
 
-  function closeModal() {
-    if (isCreating) {
-      return;
-    }
-
-    setIsOpen(false);
-    setFolderName("");
-    setErrorMessage(null);
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedFolderName = folderName.trim();

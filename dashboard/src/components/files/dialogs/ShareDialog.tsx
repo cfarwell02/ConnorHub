@@ -274,6 +274,7 @@ export default function ShareDialog({
           />
           {qrCodeUrl && (
             <div className="mt-4 rounded-xl border border-zinc-800 bg-white p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={qrCodeUrl}
                 alt={`QR code for ${sharedName}`}
