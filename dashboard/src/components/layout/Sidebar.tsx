@@ -7,10 +7,7 @@ import { Trash2 } from "lucide-react";
 const storageLinks = [
   { label: "Projects", icon: "📁", path: "Projects" },
   { label: "School", icon: "🎓", path: "School" },
-  { label: "Learning", icon: "📚", path: "Learning" },
-  { label: "Docs", icon: "📄", path: "Docs" },
   { label: "Assets", icon: "🖼️", path: "Assets" },
-  { label: "Archive", icon: "📦", path: "Archive" },
 ];
 
 type SidebarProps = {

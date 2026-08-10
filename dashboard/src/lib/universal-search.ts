@@ -5,6 +5,7 @@ import {
   readFile as readJsonFile,
   readdir,
   writeFile,
+  stat,
 } from "node:fs/promises";
 import path from "node:path";
 import { CONNORHUB_ROOT } from "@/lib/server-data";
@@ -26,6 +27,7 @@ export type UniversalSearchResult = {
     | "workspace-task"
     | "workspace-link";
   extension: string | null;
+  sizeBytes?: number;
   sourceFolderPath?: string;
   matchedText?: string;
   url?: string;
@@ -334,6 +336,13 @@ async function indexDirectory(
       .split(path.sep)
       .join("/");
 
+    let sizeBytes: number | undefined;
+
+    if (entry.isFile()) {
+      const fileStats = await stat(absolutePath);
+      sizeBytes = fileStats.size;
+    }
+
     currentResults.push({
       id: relativePath,
       name: entry.name,
@@ -341,6 +350,7 @@ async function indexDirectory(
       parentPath: getParentPath(relativePath),
       type: entry.isDirectory() ? "folder" : "file",
       extension: entry.isDirectory() ? null : getExtension(entry.name),
+      sizeBytes,
     });
 
     if (entry.isDirectory()) {
@@ -385,7 +395,12 @@ function calculateSearchScore(
 }
 
 function shouldIgnoreEntry(name: string): boolean {
-  return name === ".connorhub" || name === ".DS_Store" || name === "Thumbs.db";
+  return (
+    name === ".connorhub" ||
+    name === ".DS_Store" ||
+    name === "Thumbs.db" ||
+    name.startsWith("._")
+  );
 }
 
 function getParentPath(relativePath: string): string {
