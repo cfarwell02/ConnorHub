@@ -4,6 +4,7 @@ import "./globals.css";
 import SidebarShell from "@/components/layout/SidebarShell";
 import FileKeyboardShortcuts from "@/components/files/FileKeyboardShortcuts";
 import UniversalSearchDialog from "@/components/search/UniversalSearchDialog";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,7 +35,13 @@ export default function RootLayout({
         <FileKeyboardShortcuts />
         <UniversalSearchDialog />
         <div className="flex min-h-screen">
-          <SidebarShell />
+          <Suspense
+            fallback={
+              <aside className="hidden h-screen w-64 shrink-0 border-r border-zinc-800 bg-zinc-950 lg:block" />
+            }
+          >
+            <SidebarShell />
+          </Suspense>
 
           <div className="min-w-0 flex-1">{children}</div>
         </div>
