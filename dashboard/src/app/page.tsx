@@ -7,13 +7,37 @@ import {
   getStorageInfo,
 } from "@/lib/server-data";
 import type { FileBrowserItem } from "@/types/files";
+import { getConnorHubDevices, ConnorHubDevice } from "@/lib/devices";
+import { getTailscaleDevices } from "@/lib/tailscale";
 
 export const dynamic = "force-dynamic";
 
+const projects = [
+  {
+    id: "connorhub",
+    name: "ConnorHub",
+    status: "clean",
+    branch: "main",
+  },
+  {
+    id: "connorhub-agent",
+    name: "ConnorHub Agent",
+    status: "clean",
+    branch: "main",
+  },
+  {
+    id: "sidequest",
+    name: "SideQuest",
+    status: "changes",
+    branch: "main",
+  },
+] as const;
+
 export default async function Home() {
-  const [storage, recentFiles, quickAccessResult] = await Promise.all([
+  const [storage, recentFiles, quickAccessResult, devices] = await Promise.all([
     getStorageInfo(),
     getRecentFiles(),
+
     getDirectoryContents("")
       .then((items) => ({
         items,
@@ -27,17 +51,12 @@ export default async function Home() {
           error: "The ConnorHub root directory could not be loaded.",
         };
       }),
+
+    getConnorHubDevices(),
   ]);
 
-  let quickAccessItems = quickAccessResult.items;
-  let quickAccessError = quickAccessResult.error;
-
-  try {
-    quickAccessItems = await getDirectoryContents("");
-  } catch (error) {
-    console.error("Unable to load ConnorHub root directory:", error);
-    quickAccessError = "The ConnorHub root directory could not be loaded.";
-  }
+  const quickAccessItems = quickAccessResult.items;
+  const quickAccessError = quickAccessResult.error;
 
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-8 text-zinc-100">
@@ -64,36 +83,51 @@ export default async function Home() {
           </div>
         </header>
 
-        <section className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label="Storage used"
-            value={storage ? formatBytes(storage.usedBytes) : "Unavailable"}
-            detail={
-              storage
-                ? `${formatBytes(storage.freeBytes)} free`
-                : "Storage path unavailable"
-            }
-          />
+        <section className="mb-10">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold">Devices</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Devices connected to ConnorHub.
+            </p>
+          </div>
 
-          <StatCard
-            label="Storage capacity"
-            value={storage ? formatBytes(storage.totalBytes) : "Unavailable"}
-            detail={
-              storage ? `${storage.usedPercent}% used` : "Check configuration"
-            }
-          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {devices.map((device) => (
+              <DeviceCard key={device.id} device={device} />
+            ))}
+          </div>
+        </section>
 
-          <StatCard
-            label="Recent items"
-            value={String(recentFiles.length)}
-            detail="Latest server activity"
-          />
+        <section className="mb-10">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold">Quick actions</h2>
 
-          <StatCard
-            label="Server location"
-            value="Raspberry Pi"
-            detail="Connected through Tailscale"
-          />
+            <p className="mt-1 text-sm text-zinc-500">
+              Common ConnorHub operations.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <ActionCard
+              title="Deploy ConnorHub"
+              description="Pull, build, and restart the dashboard."
+            />
+
+            <ActionCard
+              title="Create Backup"
+              description="Back up ConnorHub storage."
+            />
+
+            <ActionCard
+              title="View Logs"
+              description="Inspect recent dashboard logs."
+            />
+
+            <ActionCard
+              title="Refresh Projects"
+              description="Fetch updates for server repositories."
+            />
+          </div>
         </section>
 
         {storage && (
@@ -113,6 +147,35 @@ export default async function Home() {
             </div>
           </section>
         )}
+
+        <section className="mb-10">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">Projects</h2>
+
+              <p className="mt-1 text-sm text-zinc-500">
+                Git status for projects stored on ConnorHub.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="text-sm font-medium text-zinc-400 transition hover:text-zinc-100"
+            >
+              Refresh projects
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
+            {projects.map((project, index) => (
+              <ProjectRow
+                key={project.id}
+                project={project}
+                showBorder={index !== projects.length - 1}
+              />
+            ))}
+          </div>
+        </section>
 
         <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
           <section>
@@ -227,19 +290,36 @@ export default async function Home() {
   );
 }
 
-type StatCardProps = {
-  label: string;
-  value: string;
-  detail: string;
+type ProjectRowProps = {
+  project: (typeof projects)[number];
+  showBorder: boolean;
 };
 
-function StatCard({ label, value, detail }: StatCardProps) {
+function ProjectRow({ project, showBorder }: ProjectRowProps) {
+  const clean = project.status === "clean";
+
   return (
-    <article className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className="mt-3 text-2xl font-semibold">{value}</p>
-      <p className="mt-1 text-sm text-zinc-600">{detail}</p>
-    </article>
+    <div
+      className={`flex items-center justify-between gap-4 px-5 py-4 ${
+        showBorder ? "border-b border-zinc-800" : ""
+      }`}
+    >
+      <div className="min-w-0">
+        <p className="truncate font-medium text-zinc-100">{project.name}</p>
+
+        <p className="mt-1 text-sm text-zinc-500">{project.branch}</p>
+      </div>
+
+      <div className="flex items-center gap-2 text-sm">
+        <span
+          className={`h-2 w-2 rounded-full ${
+            clean ? "bg-emerald-400" : "bg-amber-400"
+          }`}
+        />
+
+        <span className="text-zinc-400">{clean ? "Clean" : "Changes"}</span>
+      </div>
+    </div>
   );
 }
 
@@ -264,4 +344,58 @@ function createFilesUrl(relativePath: string): string {
 
 function createPreviewUrl(relativePath: string): string {
   return `/preview?path=${encodeURIComponent(relativePath)}`;
+}
+
+type DeviceCardProps = {
+  device: ConnorHubDevice;
+};
+
+function DeviceCard({ device }: DeviceCardProps) {
+  const online = device.status === "online";
+
+  return (
+    <article className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="font-semibold">{device.name}</h3>
+
+          <p className="mt-1 text-sm text-zinc-500">{device.type}</p>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm text-zinc-400">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              online ? "bg-emerald-400" : "bg-zinc-600"
+            }`}
+          />
+
+          {online ? "Online" : "Offline"}
+        </div>
+      </div>
+
+      {device.agentStatus && (
+        <p className="mt-4 text-xs text-zinc-600">
+          Agent: {device.agentStatus === "online" ? "Online" : "Offline"}
+        </p>
+      )}
+    </article>
+  );
+}
+
+type ActionCardProps = {
+  title: string;
+  description: string;
+};
+
+function ActionCard({ title, description }: ActionCardProps) {
+  return (
+    <button
+      type="button"
+      className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-left transition hover:border-zinc-700 hover:bg-zinc-800/80"
+    >
+      <p className="font-medium text-zinc-100">{title}</p>
+
+      <p className="mt-2 text-sm leading-6 text-zinc-500">{description}</p>
+    </button>
+  );
 }
